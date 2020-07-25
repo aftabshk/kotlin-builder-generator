@@ -16,4 +16,14 @@
         <listener class="com.github.affishaikh.kotlinbuildergenerator.listeners.MyProjectManagerListener"
                   topic="com.intellij.openapi.project.ProjectManagerListener"/>
     </projectListeners>
+
+    <actions>
+        <action
+                id="SayHelloWorld"
+                class="com.github.affishaikh.kotlinbuildergenerator.action.Greet"
+                text="Say hello"
+                description="Greets people">
+            <add-to-group group-id="ToolsMenu" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
