@@ -1,4 +1,4 @@
-package com.github.affishaikh.kotlinbuildergenerator.action
+package com.github.affishaikh.kotlinbuildergenerator.domain
 
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.vfs.VirtualFile
