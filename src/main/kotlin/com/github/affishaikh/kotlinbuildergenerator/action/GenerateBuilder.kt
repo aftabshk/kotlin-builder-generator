@@ -6,6 +6,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
+import org.jetbrains.kotlin.idea.refactoring.memberInfo.qualifiedClassNameForRendering
 import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.types.KotlinType
@@ -15,10 +16,11 @@ class GenerateBuilder: SelfTargetingIntention<KtClass>(
     "Generate builder"
 ) {
     override fun applyTo(element: KtClass, editor: Editor?) {
+        val packageName = extractPackageNameFrom(element.qualifiedClassNameForRendering())
         val parameters = element.primaryConstructor?.valueParameters!!.map {
             Parameter(it.name!!, it.type()!!)
         }
-        val code = createClassFromParams(element.name!!, parameters)
+        val code = createClassFromParams(element.name!!, parameters, packageName)
         createFile(element, code)
     }
 
@@ -33,13 +35,14 @@ class GenerateBuilder: SelfTargetingIntention<KtClass>(
         containingDirectory.add(file)
     }
 
-    private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
+    private fun createClassFromParams(className: String, parameters: List<Parameter>, packageName: String): String {
+        val packageStatement = "package ${packageName}\n\n"
         val prefix = "data class ${className}Builder(\n"
         val params = parameters.map {
             "val ${it.name}: ${it.type} = ${defaultValue(it.type)}"
         }.joinToString(",\n")
         val functionBody = createBuildFunction(className, parameters.map { it.name })
-        return "${prefix}${params}\n) {\n$functionBody\n}"
+        return "${packageStatement}${prefix}${params}\n) {\n$functionBody\n}"
     }
 
     private fun createBuildFunction(className: String, parameterNames: List<String>): String {
@@ -66,5 +69,10 @@ class GenerateBuilder: SelfTargetingIntention<KtClass>(
             parameterType.isMarkedNullable -> "null"
             else -> ""
         }
+    }
+
+    private fun extractPackageNameFrom(qualifiedName: String): String {
+        val packageFragments = qualifiedName.split(".")
+        return packageFragments.take(packageFragments.size - 1).joinToString(".")
     }
 }
