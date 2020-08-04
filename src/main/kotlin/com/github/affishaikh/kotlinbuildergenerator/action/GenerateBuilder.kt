@@ -32,10 +32,19 @@ class GenerateBuilder: SelfTargetingIntention<KtClass>(
     }
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
-        val prefix = "data class ${className}(\n"
+        val prefix = "data class ${className}Builder(\n"
         val params = parameters.map {
             "val ${it.name}: ${it.type}"
         }.joinToString(",\n")
-        return "${prefix}${params}\n)"
+        val functionBody = createBuildFunction(className, parameters.map { it.name })
+        return "${prefix}${params}\n) {\n$functionBody\n}"
+    }
+
+    private fun createBuildFunction(className: String, parameterNames: List<String>): String {
+        val declaration = "fun build(): ${className} {\nreturn ${className}(\n"
+        val params = parameterNames.map {
+            "$it = $it"
+        }.joinToString(",\n")
+        return "$declaration$params\n)\n}"
     }
 }
