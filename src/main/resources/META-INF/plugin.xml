@@ -6,6 +6,7 @@
     <!-- Product and plugin compatibility requirements -->
     <!-- https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.kotlin</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="com.github.affishaikh.kotlinbuildergenerator.services.MyApplicationService"/>
@@ -26,4 +27,11 @@
             <add-to-group group-id="ToolsMenu" anchor="last"/>
         </action>
     </actions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <intentionAction>
+            <className>com.github.affishaikh.kotlinbuildergenerator.action.GenerateBuilder</className>
+            <category>Kotlin</category>
+        </intentionAction>
+    </extensions>
 </idea-plugin>
