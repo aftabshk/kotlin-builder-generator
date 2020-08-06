@@ -10,8 +10,9 @@ import org.jetbrains.kotlin.idea.refactoring.memberInfo.qualifiedClassNameForRen
 import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlinx.serialization.compiler.resolve.toClassDescriptor
 
-class GenerateBuilder: SelfTargetingIntention<KtClass>(
+class GenerateBuilder : SelfTargetingIntention<KtClass>(
     KtClass::class.java,
     "Generate builder"
 ) {
@@ -20,8 +21,50 @@ class GenerateBuilder: SelfTargetingIntention<KtClass>(
         val parameters = element.primaryConstructor?.valueParameters!!.map {
             Parameter(it.name!!, it.type()!!)
         }
-        val code = createClassFromParams(element.name!!, parameters, packageName)
-        createFile(element, code)
+
+        val packageStatement = "package ${packageName}\n\n"
+
+        val mainClass = createClassFromParams(element.name!!, parameters)
+
+        val code = getAllClassesThatNeedsABuilder(parameters).map {
+            val params = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map {valueParam ->
+                Parameter(valueParam.name.identifier, valueParam.type!!)
+            }
+            createClassFromParams(it.type.toString(), params)
+        }.joinToString("\n")
+        createFile(element, "$packageStatement$mainClass\n$code")
+    }
+
+    private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<Parameter> {
+        if (parameters.isEmpty()) return emptyList()
+
+        val params = parameters.filter {
+            !isKotlinBuiltinType(it.type) && it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.isNotEmpty()
+        }
+
+        val newParams = params.map {
+            it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map {valueParam ->
+                Parameter(valueParam.name.identifier, valueParam.type)
+            }
+        }.flatten()
+
+        return listOf(params, getAllClassesThatNeedsABuilder(newParams)).flatten()
+    }
+
+    private fun isKotlinBuiltinType(type: KotlinType): Boolean {
+        return KotlinBuiltIns.isBoolean(type) ||
+            KotlinBuiltIns.isChar(type) ||
+            KotlinBuiltIns.isDouble(type) ||
+            KotlinBuiltIns.isFloat(type) ||
+            KotlinBuiltIns.isInt(type) ||
+            KotlinBuiltIns.isLong(type) ||
+            KotlinBuiltIns.isShort(type) ||
+            KotlinBuiltIns.isCollectionOrNullableCollection(type) ||
+            KotlinBuiltIns.isNullableAny(type) ||
+            KotlinBuiltIns.isString(type) ||
+            KotlinBuiltIns.isListOrNullableList(type) ||
+            KotlinBuiltIns.isSetOrNullableSet(type) ||
+            KotlinBuiltIns.isMapOrNullableMap(type)
     }
 
     override fun isApplicableTo(element: KtClass, caretOffset: Int): Boolean {
@@ -35,14 +78,13 @@ class GenerateBuilder: SelfTargetingIntention<KtClass>(
         containingDirectory.add(file)
     }
 
-    private fun createClassFromParams(className: String, parameters: List<Parameter>, packageName: String): String {
-        val packageStatement = "package ${packageName}\n\n"
+    private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
         val prefix = "data class ${className}Builder(\n"
         val params = parameters.map {
             "val ${it.name}: ${it.type} = ${defaultValue(it.type)}"
         }.joinToString(",\n")
         val functionBody = createBuildFunction(className, parameters.map { it.name })
-        return "${packageStatement}${prefix}${params}\n) {\n$functionBody\n}"
+        return "${prefix}${params}\n) {\n$functionBody\n}"
     }
 
     private fun createBuildFunction(className: String, parameterNames: List<String>): String {
