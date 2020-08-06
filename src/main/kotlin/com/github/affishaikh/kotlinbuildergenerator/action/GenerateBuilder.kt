@@ -7,6 +7,7 @@ import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.qualifiedClassNameForRendering
+import org.jetbrains.kotlin.js.descriptorUtils.nameIfStandardType
 import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.types.KotlinType
@@ -39,7 +40,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         if (parameters.isEmpty()) return emptyList()
 
         val params = parameters.filter {
-            !isKotlinBuiltinType(it.type) && it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.isNotEmpty()
+            doesNeedABuilder(it.type)
         }
 
         val newParams = params.map {
@@ -50,6 +51,9 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
 
         return listOf(params, getAllClassesThatNeedsABuilder(newParams)).flatten()
     }
+
+    private fun doesNeedABuilder(it: KotlinType) =
+        !isKotlinBuiltinType(it) && it.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.isNotEmpty()
 
     private fun isKotlinBuiltinType(type: KotlinType): Boolean {
         return KotlinBuiltIns.isBoolean(type) ||
@@ -109,6 +113,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             KotlinBuiltIns.isSetOrNullableSet(parameterType) -> "setOf()"
             KotlinBuiltIns.isMapOrNullableMap(parameterType) -> "mapOf()"
             parameterType.isMarkedNullable -> "null"
+            doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
             else -> ""
         }
     }
