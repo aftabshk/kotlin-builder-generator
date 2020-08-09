@@ -5,6 +5,7 @@ import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.qualifiedClassNameForRendering
 import org.jetbrains.kotlin.nj2k.postProcessing.type
@@ -26,13 +27,36 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
 
         val mainClass = createClassFromParams(element.name!!, parameters)
 
-        val code = getAllClassesThatNeedsABuilder(parameters).map {
-            val params = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map {valueParam ->
+
+        val allBuilderClasses = getAllClassesThatNeedsABuilder(parameters)
+
+        val importStatements = getAllImportStatements(allBuilderClasses, packageName)
+
+        val code = allBuilderClasses.joinToString("\n") {
+            val params = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
                 Parameter(valueParam.name.identifier, valueParam.type!!)
             }
             createClassFromParams(it.type.toString(), params)
-        }.joinToString("\n")
-        createFile(element, "$packageStatement$mainClass\n$code")
+        }
+
+        val importStatementsCode = importStatements.joinToString("\n")
+        createFile(element, "$packageStatement$importStatementsCode\n\n$mainClass\n$code")
+    }
+
+    private fun getAllImportStatements(parameters: List<Parameter>, packageName: String): List<String> {
+        return parameters.fold(emptyList()) { importStatements, it ->
+            if (!isInSamePackage(it.type, packageName)) {
+                val importStatement =
+                    "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.type}"
+                importStatements + listOf(importStatement)
+            } else {
+                importStatements
+            }
+        }
+    }
+
+    private fun isInSamePackage(type: KotlinType, packageName: String): Boolean {
+        return (type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName.toString() == packageName
     }
 
     private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<Parameter> {
