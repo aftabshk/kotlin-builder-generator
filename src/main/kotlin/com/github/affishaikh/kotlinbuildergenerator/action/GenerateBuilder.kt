@@ -28,7 +28,6 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
 
         val mainClass = createClassFromParams(element.name!!, parameters)
 
-
         val allBuilderClasses = getAllClassesThatNeedsABuilder(parameters)
 
         val importStatements = getAllImportStatements(allBuilderClasses, packageName)
@@ -92,7 +91,9 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             KotlinBuiltIns.isString(type) ||
             KotlinBuiltIns.isListOrNullableList(type) ||
             KotlinBuiltIns.isSetOrNullableSet(type) ||
-            KotlinBuiltIns.isMapOrNullableMap(type)
+            KotlinBuiltIns.isMapOrNullableMap(type) ||
+            isBigDecimal(type) ||
+            isEnumClass(type)
     }
 
     override fun isApplicableTo(element: KtClass, caretOffset: Int): Boolean {
@@ -138,7 +139,9 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             KotlinBuiltIns.isListOrNullableList(parameterType) -> "listOf()"
             KotlinBuiltIns.isSetOrNullableSet(parameterType) -> "setOf()"
             KotlinBuiltIns.isMapOrNullableMap(parameterType) -> "mapOf()"
+            isBigDecimal(parameterType) -> "BigDecimal.ZERO"
             parameterType.isMarkedNullable -> "null"
+            isEnumClass(parameterType) -> ""
             doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
             else -> ""
         }
@@ -147,5 +150,13 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun extractPackageNameFrom(qualifiedName: String): String {
         val packageFragments = qualifiedName.split(".")
         return packageFragments.take(packageFragments.size - 1).joinToString(".")
+    }
+
+    private fun isBigDecimal(parameterType: KotlinType): Boolean {
+        return parameterType.constructor.declarationDescriptor?.name?.identifier == "BigDecimal"
+    }
+
+    private fun isEnumClass(parameterType: KotlinType): Boolean {
+        return parameterType.toClassDescriptor?.kind?.name == "ENUM_CLASS"
     }
 }
