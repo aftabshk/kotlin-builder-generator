@@ -2,6 +2,7 @@ package com.github.affishaikh.kotlinbuildergenerator.action
 
 import com.github.affishaikh.kotlinbuildergenerator.domain.KotlinFileType
 import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
+import com.github.affishaikh.kotlinbuildergenerator.ui.PackageNameInputPrompt
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
@@ -99,10 +100,12 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun createFile(element: KtClass, classCode: String) {
-        val containingDirectory = element.containingFile.containingDirectory
+        val packageNameInputPrompt = PackageNameInputPrompt(element.project)
+        packageNameInputPrompt.showAndGet()
+        val psiDirectory = packageNameInputPrompt.selectedPackage.directories[0]
         val psiFileFactory = PsiFileFactory.getInstance(element.project)
         val file = psiFileFactory.createFileFromText("${element.name}Builder.kt", KotlinFileType(), classCode)
-        containingDirectory.add(file)
+        psiDirectory.add(file)
     }
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
