@@ -27,42 +27,44 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun generateCode(element: KtClass, selectedPackageName: String): String {
-        val mainClassPackageName = element.qualifiedClassNameForRendering()
-        val parameters = element.primaryConstructor?.valueParameters!!.map {
-            Parameter(it.name!!, it.type()!!)
-        }
-        val mainClass = createClassFromParams(element.name!!, parameters)
-        val allBuilderClasses = getAllClassesThatNeedsABuilder(parameters)
-        val importStatementsForDependentClasses = getAllImportStatements(allBuilderClasses, selectedPackageName)
-
-        val importStatements = if(mainClassPackageName == selectedPackageName) {
-            importStatementsForDependentClasses
-        } else {
-            importStatementsForDependentClasses.plus("import $mainClassPackageName")
-        }
-
+        val rootClassPackageName = element.qualifiedClassNameForRendering()
+        val classProperties = element.properties()
+        val mainClass = createClassFromParams(element.name!!, classProperties)
+        val allBuilderClasses = getAllClassesThatNeedsABuilder(classProperties)
+        val importStatements = getAllImportStatements(allBuilderClasses, selectedPackageName, rootClassPackageName)
         val dependentBuilderCodes = allBuilderClasses.joinToString("\n") {
             val params = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
                 Parameter(valueParam.name.identifier, valueParam.type!!)
             }
             createClassFromParams(it.typeName(), params)
         }
-
         return "package $selectedPackageName\n\n${importStatements.joinToString("\n")}\n\n$mainClass\n\n$dependentBuilderCodes"
-
     }
 
-    private fun getAllImportStatements(parameters: List<Parameter>, packageName: String): List<String> {
-        return parameters.fold(emptyList()) { importStatements, it ->
+    private fun KtClass.properties(): List<Parameter> {
+        return this.primaryConstructor?.valueParameters?.map {
+            Parameter(it.name!!, it.type()!!)
+        } ?: emptyList()
+    }
+
+    private fun getAllImportStatements(parameters: List<Parameter>, packageName: String, rootClassPackageName: String): List<String> {
+        val importStatements = parameters.fold(emptyList()) { i: List<String>, it: Parameter ->
             if (!isInSamePackage(it.type, packageName)) {
-                val importStatement =
-                    "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.typeName()}"
-                importStatements + listOf(importStatement)
+                i.plus(createImportStatement(it))
             } else {
-                importStatements
+                i
             }
         }
+
+        return if(rootClassPackageName == packageName) {
+            importStatements
+        } else {
+            importStatements.plus("import $rootClassPackageName")
+        }
     }
+
+    private fun createImportStatement(it: Parameter) =
+        "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.typeName()}"
 
     private fun isInSamePackage(type: KotlinType, packageName: String): Boolean {
         return (type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName.toString() == packageName
