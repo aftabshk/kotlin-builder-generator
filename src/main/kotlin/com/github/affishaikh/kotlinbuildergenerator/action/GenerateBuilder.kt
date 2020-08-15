@@ -32,8 +32,8 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         val classProperties = element.properties()
         val allBuilderClasses = getAllClassesThatNeedsABuilder(classProperties)
         val importStatements = getAllImportStatements(allBuilderClasses, selectedPackageName, rootClassPackageName)
-        val dependentBuilderCodes = allBuilderClasses
-            .plus(ClassInfo(element.name!!, null, classProperties))
+        val dependentBuilderCodes = listOf(ClassInfo(element.name!!, null, classProperties))
+            .plus(allBuilderClasses)
             .joinToString("\n") {
                 createClassFromParams(it.name, it.parameters)
             }
