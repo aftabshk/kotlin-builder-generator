@@ -1,5 +1,6 @@
 package com.github.affishaikh.kotlinbuildergenerator.action
 
+import com.github.affishaikh.kotlinbuildergenerator.domain.ClassInfo
 import com.github.affishaikh.kotlinbuildergenerator.domain.KotlinFileType
 import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
 import com.github.affishaikh.kotlinbuildergenerator.ui.PackageNameInputPrompt
@@ -29,16 +30,14 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun generateCode(element: KtClass, selectedPackageName: String): String {
         val rootClassPackageName = element.qualifiedClassNameForRendering()
         val classProperties = element.properties()
-        val mainClass = createClassFromParams(element.name!!, classProperties)
         val allBuilderClasses = getAllClassesThatNeedsABuilder(classProperties)
         val importStatements = getAllImportStatements(allBuilderClasses, selectedPackageName, rootClassPackageName)
-        val dependentBuilderCodes = allBuilderClasses.joinToString("\n") {
-            val params = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
-                Parameter(valueParam.name.identifier, valueParam.type!!)
+        val dependentBuilderCodes = allBuilderClasses
+            .plus(ClassInfo(element.name!!, null, classProperties))
+            .joinToString("\n") {
+                createClassFromParams(it.name, it.parameters)
             }
-            createClassFromParams(it.typeName(), params)
-        }
-        return "package $selectedPackageName\n\n${importStatements.joinToString("\n")}\n\n$mainClass\n\n$dependentBuilderCodes"
+        return "package $selectedPackageName\n\n${importStatements.joinToString("\n")}\n\n$dependentBuilderCodes"
     }
 
     private fun KtClass.properties(): List<Parameter> {
@@ -47,41 +46,46 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         } ?: emptyList()
     }
 
-    private fun getAllImportStatements(parameters: List<Parameter>, packageName: String, rootClassPackageName: String): List<String> {
-        val importStatements = parameters.fold(emptyList()) { i: List<String>, it: Parameter ->
-            if (!isInSamePackage(it.type, packageName)) {
+    private fun getAllImportStatements(classInfos: List<ClassInfo>, packageName: String, rootClassPackageName: String): List<String> {
+        val importStatements = classInfos.fold(emptyList()) { i: List<String>, it: ClassInfo ->
+            if (!isInSamePackage(it.type!!, packageName)) {
                 i.plus(createImportStatement(it))
             } else {
                 i
             }
         }
 
-        return if(rootClassPackageName == packageName) {
+        return if (rootClassPackageName == packageName) {
             importStatements
         } else {
             importStatements.plus("import $rootClassPackageName")
         }
     }
 
-    private fun createImportStatement(it: Parameter) =
-        "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.typeName()}"
+    private fun createImportStatement(it: ClassInfo) =
+        "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.name}"
 
     private fun isInSamePackage(type: KotlinType, packageName: String): Boolean {
         return (type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName.toString() == packageName
     }
 
-    private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<Parameter> {
+    private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<ClassInfo> {
         if (parameters.isEmpty()) return emptyList()
 
-        val params = parameters.filter { doesNeedABuilder(it.type) }
-
-        val newParams = params.map {
-            it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map {valueParam ->
-                Parameter(valueParam.name.identifier, valueParam.type)
+        val builderClassInfo = parameters
+            .filter { doesNeedABuilder(it.type) }
+            .map {
+                val properties = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
+                    Parameter(valueParam.name.identifier, valueParam.type)
+                }
+                ClassInfo(it.typeName(), it.type, properties)
             }
-        }.flatten()
 
-        return listOf(params, getAllClassesThatNeedsABuilder(newParams)).flatten()
+        val newParams = builderClassInfo.flatMap {
+            it.parameters
+        }
+
+        return listOf(builderClassInfo, getAllClassesThatNeedsABuilder(newParams)).flatten()
     }
 
     private fun doesNeedABuilder(it: KotlinType) =
@@ -116,19 +120,19 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
-        val prefix = "data class ${className}Builder(\n"
-        val params = parameters.joinToString(",\n") {
+        val classHeader = "data class ${className}Builder(\n"
+        val properties = parameters.joinToString(",\n") {
             "val ${it.name}: ${it.type} = ${defaultValue(it.type)}"
         }
         val functionBody = createBuildFunction(className, parameters.map { it.name })
-        return "${prefix}${params}\n) {\n$functionBody\n}"
+        return "${classHeader}${properties}\n) {\n$functionBody\n}"
     }
 
     private fun createBuildFunction(className: String, parameterNames: List<String>): String {
-        val declaration = "fun build(): ${className} {\nreturn ${className}(\n"
-        val params = parameterNames.map {
+        val declaration = "fun build(): $className {\nreturn ${className}(\n"
+        val params = parameterNames.joinToString(",\n") {
             "$it = $it"
-        }.joinToString(",\n")
+        }
         return "$declaration$params\n)\n}"
     }
 
@@ -151,11 +155,6 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
             else -> ""
         }
-    }
-
-    private fun extractPackageNameFrom(qualifiedName: String): String {
-        val packageFragments = qualifiedName.split(".")
-        return packageFragments.take(packageFragments.size - 1).joinToString(".")
     }
 
     private fun isBigDecimal(parameterType: KotlinType): Boolean {
