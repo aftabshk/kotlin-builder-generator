@@ -45,7 +45,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             val params = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
                 Parameter(valueParam.name.identifier, valueParam.type!!)
             }
-            createClassFromParams(it.type.toString(), params)
+            createClassFromParams(it.typeName(), params)
         }
 
         return "package $selectedPackageName\n\n${importStatements.joinToString("\n")}\n\n$mainClass\n\n$dependentBuilderCodes"
@@ -56,7 +56,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         return parameters.fold(emptyList()) { importStatements, it ->
             if (!isInSamePackage(it.type, packageName)) {
                 val importStatement =
-                    "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.type}"
+                    "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.typeName()}"
                 importStatements + listOf(importStatement)
             } else {
                 importStatements
@@ -71,9 +71,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<Parameter> {
         if (parameters.isEmpty()) return emptyList()
 
-        val params = parameters.filter {
-            doesNeedABuilder(it.type)
-        }
+        val params = parameters.filter { doesNeedABuilder(it.type) }
 
         val newParams = params.map {
             it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map {valueParam ->
@@ -115,9 +113,9 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
         val prefix = "data class ${className}Builder(\n"
-        val params = parameters.map {
+        val params = parameters.joinToString(",\n") {
             "val ${it.name}: ${it.type} = ${defaultValue(it.type)}"
-        }.joinToString(",\n")
+        }
         val functionBody = createBuildFunction(className, parameters.map { it.name })
         return "${prefix}${params}\n) {\n$functionBody\n}"
     }
@@ -147,10 +145,5 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
             else -> ""
         }
-    }
-
-    private fun extractPackageNameFrom(qualifiedName: String): String {
-        val packageFragments = qualifiedName.split(".")
-        return packageFragments.take(packageFragments.size - 1).joinToString(".")
     }
 }
