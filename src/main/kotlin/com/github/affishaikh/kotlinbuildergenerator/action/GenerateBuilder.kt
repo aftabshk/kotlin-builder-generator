@@ -4,6 +4,7 @@ import com.github.affishaikh.kotlinbuildergenerator.domain.KotlinFileType
 import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
 import com.github.affishaikh.kotlinbuildergenerator.ui.PackageNameInputPrompt
 import com.intellij.openapi.editor.Editor
+import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
@@ -19,35 +20,43 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     "Generate builder"
 ) {
     override fun applyTo(element: KtClass, editor: Editor?) {
-        val packageName = extractPackageNameFrom(element.qualifiedClassNameForRendering())
+        val packageNameInputPrompt = PackageNameInputPrompt(element.project)
+        val code = generateCode(element, packageNameInputPrompt.qualifiedName())
+
+        createFile(element, code, packageNameInputPrompt.packageDirectory())
+    }
+
+    private fun generateCode(element: KtClass, selectedPackageName: String): String {
+        val mainClassPackageName = element.qualifiedClassNameForRendering()
         val parameters = element.primaryConstructor?.valueParameters!!.map {
             Parameter(it.name!!, it.type()!!)
         }
-
-        val packageStatement = "package ${packageName}\n\n"
-
         val mainClass = createClassFromParams(element.name!!, parameters)
-
         val allBuilderClasses = getAllClassesThatNeedsABuilder(parameters)
+        val importStatementsForDependentClasses = getAllImportStatements(allBuilderClasses, selectedPackageName)
 
-        val importStatements = getAllImportStatements(allBuilderClasses, packageName)
+        val importStatements = if(mainClassPackageName == selectedPackageName) {
+            importStatementsForDependentClasses
+        } else {
+            importStatementsForDependentClasses.plus("import $mainClassPackageName")
+        }
 
-        val code = allBuilderClasses.joinToString("\n") {
+        val dependentBuilderCodes = allBuilderClasses.joinToString("\n") {
             val params = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
                 Parameter(valueParam.name.identifier, valueParam.type!!)
             }
-            createClassFromParams(it.type.toString(), params)
+            createClassFromParams(it.typeName(), params)
         }
 
-        val importStatementsCode = importStatements.joinToString("\n")
-        createFile(element, "$packageStatement$importStatementsCode\n\n$mainClass\n$code")
+        return "package $selectedPackageName\n\n${importStatements.joinToString("\n")}\n\n$mainClass\n\n$dependentBuilderCodes"
+
     }
 
     private fun getAllImportStatements(parameters: List<Parameter>, packageName: String): List<String> {
         return parameters.fold(emptyList()) { importStatements, it ->
             if (!isInSamePackage(it.type, packageName)) {
                 val importStatement =
-                    "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.type}"
+                    "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.typeName()}"
                 importStatements + listOf(importStatement)
             } else {
                 importStatements
@@ -62,9 +71,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<Parameter> {
         if (parameters.isEmpty()) return emptyList()
 
-        val params = parameters.filter {
-            doesNeedABuilder(it.type)
-        }
+        val params = parameters.filter { doesNeedABuilder(it.type) }
 
         val newParams = params.map {
             it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map {valueParam ->
@@ -100,20 +107,17 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         return true
     }
 
-    private fun createFile(element: KtClass, classCode: String) {
-        val packageNameInputPrompt = PackageNameInputPrompt(element.project)
-        packageNameInputPrompt.showAndGet()
-        val psiDirectory = packageNameInputPrompt.selectedPackage.directories[0]
+    private fun createFile(element: KtClass, classCode: String, selectedDirectory: PsiDirectory) {
         val psiFileFactory = PsiFileFactory.getInstance(element.project)
         val file = psiFileFactory.createFileFromText("${element.name}Builder.kt", KotlinFileType(), classCode)
-        psiDirectory.add(file)
+        selectedDirectory.add(file)
     }
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
         val prefix = "data class ${className}Builder(\n"
-        val params = parameters.map {
+        val params = parameters.joinToString(",\n") {
             "val ${it.name}: ${it.type} = ${defaultValue(it.type)}"
-        }.joinToString(",\n")
+        }
         val functionBody = createBuildFunction(className, parameters.map { it.name })
         return "${prefix}${params}\n) {\n$functionBody\n}"
     }
@@ -160,3 +164,4 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         return parameterType.toClassDescriptor?.kind?.name == "ENUM_CLASS"
     }
 }
+
