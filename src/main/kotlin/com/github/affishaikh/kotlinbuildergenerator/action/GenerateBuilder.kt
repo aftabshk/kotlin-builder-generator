@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.qualifiedClassNameForRendering
+import org.jetbrains.kotlin.js.descriptorUtils.nameIfStandardType
 import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.types.KotlinType
@@ -31,7 +32,8 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         val rootClassPackageName = element.qualifiedClassNameForRendering()
         val classProperties = element.properties()
         val allBuilderClasses = getAllClassesThatNeedsABuilder(classProperties)
-        val importStatements = getAllImportStatements(allBuilderClasses, selectedPackageName, rootClassPackageName)
+        val importStatements = getAllImportStatements(classProperties, selectedPackageName)
+            .plus(importStatementForRootClass(rootClassPackageName, selectedPackageName))
         val dependentBuilderCodes = listOf(ClassInfo(element.name!!, null, classProperties))
             .plus(allBuilderClasses)
             .joinToString("\n") {
@@ -40,30 +42,46 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         return "package $selectedPackageName\n\n${importStatements.joinToString("\n")}\n\n$dependentBuilderCodes"
     }
 
+    private fun importStatementForRootClass(rootClassPackageName: String, selectedPackageName: String): Set<String> {
+        return if (rootClassPackageName == selectedPackageName) {
+            emptySet()
+        } else {
+            setOf("import $rootClassPackageName")
+        }
+    }
+
     private fun KtClass.properties(): List<Parameter> {
         return this.primaryConstructor?.valueParameters?.map {
             Parameter(it.name!!, it.type()!!)
         } ?: emptyList()
     }
 
-    private fun getAllImportStatements(classInfos: List<ClassInfo>, packageName: String, rootClassPackageName: String): List<String> {
-        val importStatements = classInfos.fold(emptyList()) { i: List<String>, it: ClassInfo ->
-            if (!isInSamePackage(it.type!!, packageName)) {
-                i.plus(createImportStatement(it))
-            } else {
-                i
-            }
+    private fun getAllImportStatements(properties: List<Parameter>, packageName: String): Set<String> {
+        if (properties.isEmpty()) {
+            return emptySet()
         }
 
-        return if (rootClassPackageName == packageName) {
-            importStatements
-        } else {
-            importStatements.plus("import $rootClassPackageName")
+        return properties.fold(emptySet()) { acc, prop ->
+            val importStatement = if (doesNeedAImport(prop.type, packageName)) {
+                setOf(createImportStatement(prop.type, prop.typeName()))
+            } else {
+                emptySet()
+            }
+
+            if (doesNeedABuilder(prop.type)) {
+                acc.plus(importStatement.plus(getAllImportStatements(prop.type.properties(), packageName)))
+            } else {
+                acc.plus(importStatement)
+            }
         }
     }
 
-    private fun createImportStatement(it: ClassInfo) =
-        "import ${(it.type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.${it.name}"
+    private fun doesNeedAImport(type: KotlinType, packageName: String): Boolean {
+        return type.nameIfStandardType == null && !isInSamePackage(type, packageName)
+    }
+
+    private fun createImportStatement(type: KotlinType, name: String): String =
+        "import ${(type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.$name"
 
     private fun isInSamePackage(type: KotlinType, packageName: String): Boolean {
         return (type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName.toString() == packageName
@@ -75,10 +93,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         val builderClassInfo = parameters
             .filter { doesNeedABuilder(it.type) }
             .map {
-                val properties = it.type.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
-                    Parameter(valueParam.name.identifier, valueParam.type)
-                }
-                ClassInfo(it.typeName(), it.type, properties)
+                ClassInfo(it.typeName(), it.type, it.type.properties())
             }
 
         val newParams = builderClassInfo.flatMap {
@@ -86,6 +101,12 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         }
 
         return listOf(builderClassInfo, getAllClassesThatNeedsABuilder(newParams)).flatten()
+    }
+
+    private fun KotlinType.properties(): List<Parameter> {
+        return this.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
+            Parameter(valueParam.name.identifier, valueParam.type)
+        }
     }
 
     private fun doesNeedABuilder(it: KotlinType) =
