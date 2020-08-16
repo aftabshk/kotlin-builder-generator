@@ -3,10 +3,37 @@
     <name>kotlin-builder-generator</name>
     <vendor>affishaikh</vendor>
 
+    <description><![CDATA[
+         <p>This plugin provides the ability to create builder classes for a Kotlin Class</p>
+         Steps:
+          <ol>
+              <li>ALT+ENTER on the class name</li>
+              <li>Select generate builder option</li>
+              <li>Choose the package</li>
+              <li>Builder will be generated in that package</li>
+          </ol>
+    ]]></description>
+
+    <change-notes>
+        <![CDATA[
+           version 0.0.2
+           <br/>
+           <ul>
+           <li>Adds ability for handling the nullable properties</li>
+           </ul>
+           version 0.0.3
+           <br/>
+           <ul>
+           <li>Adds the needed import statements for each property</li>
+           </ul>
+         ]]>
+    </change-notes>
+
     <!-- Product and plugin compatibility requirements -->
     <!-- https://www.jetbrains.org/intellij/sdk/docs/basics/getting_started/plugin_compatibility.html -->
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.kotlin</depends>
+    <depends>com.intellij.modules.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <applicationService serviceImplementation="com.github.affishaikh.kotlinbuildergenerator.services.MyApplicationService"/>

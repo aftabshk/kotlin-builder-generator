@@ -3,9 +3,7 @@ package com.github.affishaikh.kotlinbuildergenerator.action
 import com.github.affishaikh.kotlinbuildergenerator.domain.ClassInfo
 import com.github.affishaikh.kotlinbuildergenerator.domain.KotlinFileType
 import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
-import com.github.affishaikh.kotlinbuildergenerator.ui.PackageNameInputPrompt
 import com.intellij.openapi.editor.Editor
-import com.intellij.psi.PsiDirectory
 import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
@@ -22,10 +20,10 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     "Generate builder"
 ) {
     override fun applyTo(element: KtClass, editor: Editor?) {
-        val packageNameInputPrompt = PackageNameInputPrompt(element.project)
-        val code = generateCode(element, packageNameInputPrompt.qualifiedName())
+        val packageName = extractPackageNameFrom(element.qualifiedClassNameForRendering())
+        val code = generateCode(element, packageName)
 
-        createFile(element, code, packageNameInputPrompt.packageDirectory())
+        createFile(element, code)
     }
 
     private fun generateCode(element: KtClass, selectedPackageName: String): String {
@@ -48,6 +46,11 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         } else {
             setOf("import $rootClassPackageName")
         }
+    }
+
+    private fun extractPackageNameFrom(qualifiedName: String): String {
+        val packageFragments = qualifiedName.split(".")
+        return packageFragments.take(packageFragments.size - 1).joinToString(".")
     }
 
     private fun KtClass.properties(): List<Parameter> {
@@ -131,13 +134,15 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     override fun isApplicableTo(element: KtClass, caretOffset: Int): Boolean {
-        return true
+        val numberOfProperties = element.primaryConstructor?.valueParameters?.size ?: return false
+        return numberOfProperties > 1
     }
 
-    private fun createFile(element: KtClass, classCode: String, selectedDirectory: PsiDirectory) {
+    private fun createFile(element: KtClass, classCode: String) {
+        val containingDirectory = element.containingFile.containingDirectory
         val psiFileFactory = PsiFileFactory.getInstance(element.project)
         val file = psiFileFactory.createFileFromText("${element.name}Builder.kt", KotlinFileType(), classCode)
-        selectedDirectory.add(file)
+        containingDirectory.add(file)
     }
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
