@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlinx.serialization.compiler.resolve.toClassDescriptor
 
+
 class GenerateBuilder : SelfTargetingIntention<KtClass>(
     KtClass::class.java,
     "Generate builder"
@@ -145,6 +146,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         containingDirectory.add(file)
     }
 
+
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
         val classHeader = "data class ${className}Builder(\n"
         val properties = parameters.joinToString(",\n") {
@@ -179,6 +181,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             parameterType.isMarkedNullable -> "null"
             isEnumClass(parameterType) -> ""
             doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
+            hasNowFunction(parameterType) -> initiateWithNow(parameterType)
             else -> ""
         }
     }
@@ -190,5 +193,20 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun isEnumClass(parameterType: KotlinType): Boolean {
         return parameterType.toClassDescriptor?.kind?.name == "ENUM_CLASS"
     }
-}
 
+    private fun hasNowFunction(parameterType: KotlinType): Boolean {
+        val name =  parameterType.constructor.declarationDescriptor?.name?.identifier
+        return temporalHavingNowFunction.contains(name)
+    }
+
+    private fun initiateWithNow(parameterType: KotlinType) : String {
+        val temporal =  parameterType.constructor.declarationDescriptor?.name?.identifier
+        return """$temporal.now()"""
+    }
+
+    private val temporalHavingNowFunction = listOf(
+        "HijrahDate", "Instant", "JapaneseDate", "LocalDate", "LocalDateTime", "LocalTime",
+        "MinguoDate", "OffsetDateTime", "OffsetTime", "ThaiBuddhistDate", "Year", "YearMonth",
+        "ZonedDateTime"
+    )
+}
