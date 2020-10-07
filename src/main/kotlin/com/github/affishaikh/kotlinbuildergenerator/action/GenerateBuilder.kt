@@ -113,7 +113,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun doesNeedABuilder(it: KotlinType) =
-        !isKotlinBuiltinType(it) && it.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.isNotEmpty()
+        !isKotlinBuiltinType(it) && it.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters?.isNotEmpty() ?: false
 
     private fun isKotlinBuiltinType(type: KotlinType): Boolean {
         return KotlinBuiltIns.isBoolean(type) ||
