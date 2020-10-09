@@ -3,6 +3,7 @@ package com.github.affishaikh.kotlinbuildergenerator.action
 import com.github.affishaikh.kotlinbuildergenerator.domain.ClassInfo
 import com.github.affishaikh.kotlinbuildergenerator.domain.KotlinFileType
 import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
+import com.github.affishaikh.kotlinbuildergenerator.ui.Indentation
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
@@ -150,18 +151,19 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
         val classHeader = "data class ${className}Builder(\n"
         val properties = parameters.joinToString(",\n") {
-            "val ${it.name}: ${it.type} = ${defaultValue(it.type)}"
+            "${Indentation.twoTab}val ${it.name}: ${it.type} = ${defaultValue(it.type)}"
         }
         val functionBody = createBuildFunction(className, parameters.map { it.name })
-        return "${classHeader}${properties}\n) {\n$functionBody\n}"
+        return "${classHeader}${properties}\n) {\n${Indentation.oneTab}$functionBody\n}"
     }
 
     private fun createBuildFunction(className: String, parameterNames: List<String>): String {
-        val declaration = "fun build(): $className {\nreturn ${className}(\n"
+        val endingBracketIndent = " ".repeat(4)
+        val declaration = "fun build(): $className {\n${Indentation.twoTab}return ${className}(\n"
         val params = parameterNames.joinToString(",\n") {
-            "$it = $it"
+            "${Indentation.fourTab}$it = $it"
         }
-        return "$declaration$params\n)\n}"
+        return "$declaration$params\n${Indentation.twoTab})\n$endingBracketIndent}"
     }
 
     private fun defaultValue(parameterType: KotlinType): String {
