@@ -27,6 +27,11 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         createFile(element, code)
     }
 
+    override fun isApplicableTo(element: KtClass, caretOffset: Int): Boolean {
+        val numberOfProperties = element.primaryConstructor?.valueParameters?.size ?: return false
+        return numberOfProperties > 0
+    }
+
     private fun generateCode(element: KtClass, selectedPackageName: String): String {
         val rootClassPackageName = element.qualifiedClassNameForRendering()
         val classProperties = element.properties()
@@ -134,18 +139,12 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             isEnumClass(type)
     }
 
-    override fun isApplicableTo(element: KtClass, caretOffset: Int): Boolean {
-        val numberOfProperties = element.primaryConstructor?.valueParameters?.size ?: return false
-        return numberOfProperties > 1
-    }
-
     private fun createFile(element: KtClass, classCode: String) {
         val containingDirectory = element.containingFile.containingDirectory
         val psiFileFactory = PsiFileFactory.getInstance(element.project)
         val file = psiFileFactory.createFileFromText("${element.name}Builder.kt", KotlinFileType(), classCode)
         containingDirectory.add(file)
     }
-
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
         val classHeader = "data class ${className}Builder(\n"
@@ -195,12 +194,12 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun hasNowFunction(parameterType: KotlinType): Boolean {
-        val name =  parameterType.constructor.declarationDescriptor?.name?.identifier
+        val name = parameterType.constructor.declarationDescriptor?.name?.identifier
         return temporalHavingNowFunction.contains(name)
     }
 
-    private fun initiateWithNow(parameterType: KotlinType) : String {
-        val temporal =  parameterType.constructor.declarationDescriptor?.name?.identifier
+    private fun initiateWithNow(parameterType: KotlinType): String {
+        val temporal = parameterType.constructor.declarationDescriptor?.name?.identifier
         return """$temporal.now()"""
     }
 
