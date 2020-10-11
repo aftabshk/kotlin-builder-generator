@@ -15,15 +15,12 @@ import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.types.KotlinType
 import org.jetbrains.kotlinx.serialization.compiler.resolve.toClassDescriptor
 
-
 class GenerateBuilder : SelfTargetingIntention<KtClass>(
     KtClass::class.java,
     "Generate builder"
 ) {
     override fun applyTo(element: KtClass, editor: Editor?) {
-        val packageName = extractPackageNameFrom(element.qualifiedClassNameForRendering())
-        val code = generateCode(element, packageName)
-
+        val code = generateCode(element)
         createFile(element, code)
     }
 
@@ -32,26 +29,17 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         return numberOfProperties > 0
     }
 
-    private fun generateCode(element: KtClass, selectedPackageName: String): String {
-        val rootClassPackageName = element.qualifiedClassNameForRendering()
+    private fun generateCode(element: KtClass): String {
+        val packageName = extractPackageNameFrom(element.qualifiedClassNameForRendering())
         val classProperties = element.properties()
         val allBuilderClasses = getAllClassesThatNeedsABuilder(classProperties)
-        val importStatements = getAllImportStatements(classProperties, selectedPackageName)
-            .plus(importStatementForRootClass(rootClassPackageName, selectedPackageName))
+        val importStatements = getAllImportStatements(classProperties, packageName)
         val dependentBuilderCodes = listOf(ClassInfo(element.name!!, null, classProperties))
             .plus(allBuilderClasses)
             .joinToString("\n") {
                 createClassFromParams(it.name, it.parameters)
             }
-        return "package $selectedPackageName\n\n${importStatements.joinToString("\n")}\n\n$dependentBuilderCodes"
-    }
-
-    private fun importStatementForRootClass(rootClassPackageName: String, selectedPackageName: String): Set<String> {
-        return if (rootClassPackageName == selectedPackageName) {
-            emptySet()
-        } else {
-            setOf("import $rootClassPackageName")
-        }
+        return "package $packageName\n\n${importStatements.joinToString("\n")}\n\n$dependentBuilderCodes"
     }
 
     private fun extractPackageNameFrom(qualifiedName: String): String {
