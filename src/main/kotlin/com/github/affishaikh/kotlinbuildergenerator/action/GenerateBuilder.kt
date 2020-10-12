@@ -39,7 +39,13 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             .joinToString("\n") {
                 createClassFromParams(it.name, it.parameters)
             }
-        return "package $packageName\n\n${importStatements.joinToString("\n")}\n\n$dependentBuilderCodes"
+        return "package $packageName\n\n${joinImportStatements(importStatements)}$dependentBuilderCodes"
+    }
+
+    private fun joinImportStatements(importStatements: Set<String>): String {
+        return if (importStatements.isNotEmpty())
+            "${importStatements.joinToString("\n")}\n\n"
+        else ""
     }
 
     private fun extractPackageNameFrom(qualifiedName: String): String {

@@ -45,16 +45,6 @@
                   topic="com.intellij.openapi.project.ProjectManagerListener"/>
     </projectListeners>
 
-    <actions>
-        <action
-                id="SayHelloWorld"
-                class="com.github.affishaikh.kotlinbuildergenerator.action.Greet"
-                text="Say hello"
-                description="Greets people">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
-        </action>
-    </actions>
-
     <extensions defaultExtensionNs="com.intellij">
         <intentionAction>
             <className>com.github.affishaikh.kotlinbuildergenerator.action.GenerateBuilder</className>
