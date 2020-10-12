@@ -16,15 +16,19 @@
 
     <change-notes>
         <![CDATA[
-           version 0.0.2
+           version 1.0.2.RC
            <br/>
            <ul>
-           <li>Adds ability for handling the nullable properties</li>
-           </ul>
-           version 0.0.3
-           <br/>
-           <ul>
+           <li>Adds default values for properties with KotlinBuiltinType or BigDecimal</li>
            <li>Adds the needed import statements for each property</li>
+           <li>Adds null value for nullable fields</li>
+           <li>Adds package statement</li>
+           </ul>
+           version 1.0.3.RC
+           <br/>
+           <ul>
+           <li>Adds default values for properties with all types of date and time Type</li>
+           <li>Adds default value for property with enum type</li>
            </ul>
          ]]>
     </change-notes>
