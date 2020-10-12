@@ -6,6 +6,7 @@ import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
 import org.jetbrains.kotlin.idea.refactoring.memberInfo.qualifiedClassNameForRendering
@@ -80,15 +81,24 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun doesNeedAImport(type: KotlinType, packageName: String): Boolean {
-        return type.nameIfStandardType == null && !isInSamePackage(type, packageName)
+        return isNotStandardType(type) && (isNotInSamePackage(type, packageName) || isEnumClass(type))
     }
 
-    private fun createImportStatement(type: KotlinType, name: String): String =
-        "import ${(type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName}.$name"
+    private fun isNotStandardType(type: KotlinType) = type.nameIfStandardType == null
 
-    private fun isInSamePackage(type: KotlinType, packageName: String): Boolean {
-        return (type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName.toString() == packageName
+    private fun createImportStatement(type: KotlinType, className: String): String {
+        val importStatement = "import ${packagePrefix(type)}.$className"
+
+        return if (isEnumClass(type)) "$importStatement.${valueForEnum(type)}"
+        else importStatement
     }
+
+    private fun isNotInSamePackage(type: KotlinType, packageName: String): Boolean {
+        return packagePrefix(type).toString() != packageName
+    }
+
+    private fun packagePrefix(type: KotlinType) =
+        (type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName
 
     private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<ClassInfo> {
         if (parameters.isEmpty()) return emptyList()
@@ -107,7 +117,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun KotlinType.properties(): List<Parameter> {
-        return this.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!.map { valueParam ->
+        return getConstructorParameters(this).map { valueParam ->
             Parameter(valueParam.name.identifier, valueParam.type)
         }
     }
@@ -172,12 +182,24 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             KotlinBuiltIns.isMapOrNullableMap(parameterType) -> "mapOf()"
             isBigDecimal(parameterType) -> "BigDecimal.ZERO"
             parameterType.isMarkedNullable -> "null"
-            isEnumClass(parameterType) -> ""
+            isEnumClass(parameterType) -> valueForEnum(parameterType)
             doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
             hasNowFunction(parameterType) -> initiateWithNow(parameterType)
             else -> ""
         }
     }
+
+    private fun valueForEnum(parameterType: KotlinType): String {
+        val enumConstructorParams = getConstructorParameters(parameterType).map { valueParam ->
+            valueParam.name.identifier
+        } + listOf("name", "ordinal")
+
+        val enumVariableNames = parameterType.memberScope.getVariableNames().map { it.toString() }
+        return (enumVariableNames - enumConstructorParams).first().toString()
+    }
+
+    private fun getConstructorParameters(parameterType: KotlinType): MutableList<ValueParameterDescriptor> =
+        parameterType.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!
 
     private fun isBigDecimal(parameterType: KotlinType): Boolean {
         return parameterType.constructor.declarationDescriptor?.name?.identifier == "BigDecimal"
