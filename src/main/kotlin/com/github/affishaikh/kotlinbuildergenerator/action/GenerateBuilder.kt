@@ -67,7 +67,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
 
         return properties.fold(emptySet()) { acc, prop ->
             val importStatement = if (doesNeedAImport(prop.type, packageName)) {
-                setOf(createImportStatement(prop.type, prop.typeName()))
+                setOf(createImportStatement(prop.type, prop.typeName(), packageName))
             } else {
                 emptySet()
             }
@@ -86,10 +86,13 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
 
     private fun isNotStandardType(type: KotlinType) = type.nameIfStandardType == null
 
-    private fun createImportStatement(type: KotlinType, className: String): String {
+    private fun createImportStatement(type: KotlinType, className: String, packageName: String): String {
         val importStatement = "import ${packagePrefix(type)}.$className"
 
-        return if (isEnumClass(type)) "$importStatement.${valueForEnum(type)}"
+        return if (isEnumClass(type) && isNotInSamePackage(type, packageName))
+            "$importStatement\n$importStatement.${valueForEnum(type)}"
+        else if (isEnumClass(type))
+            "$importStatement.${valueForEnum(type)}"
         else importStatement
     }
 
