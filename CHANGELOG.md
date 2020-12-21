@@ -12,8 +12,12 @@
 3. null value for nullable fields
 4. Package statement
 
-## [1.0.2.RC]
+## [1.0.3.RC]
 
 ### Added
 1. Default values for properties with all types of date and time Type
 2. Default value for property with enum type
+
+## [1.0.4.RC]
+
+Made plugin compatible with upcoming 2021 versions of Intellij
