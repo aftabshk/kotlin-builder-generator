@@ -1,10 +1,9 @@
 package com.github.affishaikh.kotlinbuildergenerator.action
 
 import com.github.affishaikh.kotlinbuildergenerator.domain.ClassInfo
-import com.github.affishaikh.kotlinbuildergenerator.domain.KotlinFileType
 import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
+import com.github.affishaikh.kotlinbuildergenerator.services.FileService
 import com.intellij.openapi.editor.Editor
-import com.intellij.psi.PsiFileFactory
 import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
@@ -147,10 +146,8 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun createFile(element: KtClass, classCode: String) {
-        val containingDirectory = element.containingFile.containingDirectory
-        val psiFileFactory = PsiFileFactory.getInstance(element.project)
-        val file = psiFileFactory.createFileFromText("${element.name}Builder.kt", KotlinFileType(), classCode)
-        containingDirectory.add(file)
+        val fileService = FileService()
+        fileService.createFile(element, classCode)
     }
 
     private fun createClassFromParams(className: String, parameters: List<Parameter>): String {
