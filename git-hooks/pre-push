@@ -1,0 +1,13 @@
+#! /bin/sh
+
+RED="\033[0;31m"
+RESET="\033[0m"
+
+echo "--- Running Tests ---"
+./gradlew clean test
+if [ "$?" -ne 0 ]; then
+  echo "${RED} ***** Tests FAILED ***** ${RESET}"
+  exit 1
+fi
+
+exit 0
