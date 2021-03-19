@@ -1,15 +1,12 @@
 package com.github.affishaikh.kotlinbuildergenerator.action
 
-import com.github.affishaikh.kotlinbuildergenerator.domain.KotlinFileType
 import com.github.affishaikh.kotlinbuildergenerator.services.FileService
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.fixtures.CodeInsightTestFixture
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
 import com.intellij.testFramework.fixtures.impl.LightTempDirTestFixtureImpl
-import io.mockk.justRun
-import io.mockk.mockkConstructor
-import io.mockk.slot
-import io.mockk.verify
+import io.mockk.*
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import kotlin.test.assertEquals
@@ -17,17 +14,28 @@ import kotlin.test.assertEquals
 class GenerateBuilderTest {
     private val generateBuilderIntention = GenerateBuilder()
     private val ideaTestFixtureFactory = IdeaTestFixtureFactory.getFixtureFactory()
-    private lateinit var myFixture: CodeInsightTestFixture
+    private lateinit var fixture: CodeInsightTestFixture
 
     @Before
     fun setUp() {
+        clearAllMocks()
+        mockkConstructor(FileService::class)
+        justRun {
+            anyConstructed<FileService>().createFile(any(), any())
+        }
         val projectDescriptor = LightProjectDescriptor.EMPTY_PROJECT_DESCRIPTOR
         val fixtureBuilder = ideaTestFixtureFactory.createLightFixtureBuilder(projectDescriptor)
-        myFixture = IdeaTestFixtureFactory.getFixtureFactory().createCodeInsightFixture(
+        fixture = IdeaTestFixtureFactory.getFixtureFactory().createCodeInsightFixture(
             fixtureBuilder.fixture,
             LightTempDirTestFixtureImpl(true)
         )
-        myFixture.setUp()
+        fixture.setUp()
+    }
+
+    @After
+    fun tearDown() {
+        clearAllMocks()
+        fixture.tearDown()
     }
 
     @Test
@@ -39,13 +47,6 @@ class GenerateBuilderTest {
                 val name: String<caret>
             )
         """.trimIndent()
-
-        mockkConstructor(FileService::class)
-        justRun {
-            anyConstructed<FileService>().createFile(any(), any())
-        }
-        myFixture.configureByText(KotlinFileType(), testClass)
-        myFixture.launchAction(generateBuilderIntention)
 
         val actualBuilder = """
             package com.github.affishaikh.kotlinbuildergenerator.domain
@@ -61,15 +62,120 @@ class GenerateBuilderTest {
             }
         """.trimIndent()
 
+        verifyIntentionResults(actualBuilder, mapOf("Person.kt" to testClass))
+    }
+
+    @Test
+    fun `should create the builder for a class which has another class composed in it`() {
+        val testClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class Person(<caret>
+                val name: String,
+                val address: Address
+            )
+
+            data class Address(
+                val street: String,
+                val pinCode: Int 
+            )
+        """.trimIndent()
+
+        val actualBuilder = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class PersonBuilder(
+            val name: String = "",
+            val address: Address = AddressBuilder().build()
+            ) {
+            fun build(): Person {
+            return Person(
+            name = name,
+            address = address
+            )
+            }
+            }
+            data class AddressBuilder(
+            val street: String = "",
+            val pinCode: Int = 0
+            ) {
+            fun build(): Address {
+            return Address(
+            street = street,
+            pinCode = pinCode
+            )
+            }
+            }
+        """.trimIndent()
+
+        verifyIntentionResults(actualBuilder, mapOf("Person.kt" to testClass))
+    }
+
+    @Test
+    fun `should import the Address class to create PersonBuilder`() {
+        val personClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            import com.github.affishaikh.kotlinbuildergenerator.action.Address
+
+            data class Person(<caret>
+                val name: String,
+                val address: Address
+            )
+        """.trimIndent()
+
+        val addressClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.action
+
+            data class Address(
+                val street: String,
+                val pinCode: Int
+            )
+        """.trimIndent()
+
+        val actualBuilder = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            import com.github.affishaikh.kotlinbuildergenerator.action.Address
+
+            data class PersonBuilder(
+            val name: String = "",
+            val address: Address = AddressBuilder().build()
+            ) {
+            fun build(): Person {
+            return Person(
+            name = name,
+            address = address
+            )
+            }
+            }
+            data class AddressBuilder(
+            val street: String = "",
+            val pinCode: Int = 0
+            ) {
+            fun build(): Address {
+            return Address(
+            street = street,
+            pinCode = pinCode
+            )
+            }
+            }
+        """.trimIndent()
+
+        verifyIntentionResults(actualBuilder, mapOf("Address.kt" to addressClass, "Person.kt" to personClass))
+    }
+
+    private fun verifyIntentionResults(actualBuilder: String, testClasses: Map<String, String>) {
+        testClasses.map {
+            fixture.configureByText(it.key, it.value)
+        }
+        fixture.launchAction(generateBuilderIntention)
         val builderSlot = slot<String>()
 
         verify(exactly = 1) {
-            anyConstructed<FileService>().createFile(
-                any(),
-                capture(builderSlot)
-            )
+            anyConstructed<FileService>().createFile(any(), capture(builderSlot))
         }
 
-        assertEquals(builderSlot.captured, actualBuilder)
+        assertEquals(actualBuilder, builderSlot.captured)
     }
 }
