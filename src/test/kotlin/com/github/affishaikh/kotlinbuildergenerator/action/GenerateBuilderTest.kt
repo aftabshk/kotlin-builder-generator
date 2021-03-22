@@ -221,6 +221,43 @@ class GenerateBuilderTest {
         verifyIntentionResults(actualBuilder, mapOf("Customer.kt" to customerClass))
     }
 
+    @Test
+    fun `should create builder with default value for a property having an ENUM type`() {
+        val customerClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class Customer(<caret>
+                val name: String,
+                val gender: Gender
+            )
+
+            enum class Gender {
+                MALE,
+                FEMALE
+            }
+        """.trimIndent()
+
+        val actualBuilder = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            import com.github.affishaikh.kotlinbuildergenerator.domain.Gender.MALE
+
+            data class CustomerBuilder(
+            val name: String = "",
+            val gender: Gender = MALE
+            ) {
+            fun build(): Customer {
+            return Customer(
+            name = name,
+            gender = gender
+            )
+            }
+            }
+        """.trimIndent()
+
+        verifyIntentionResults(actualBuilder, mapOf("Customer.kt" to customerClass))
+    }
+
     private fun verifyIntentionResults(actualBuilder: String, testClasses: Map<String, String>) {
         testClasses.map {
             fixture.configureByText(it.key, it.value)
