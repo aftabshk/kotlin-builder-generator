@@ -102,8 +102,8 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun packagePrefix(type: KotlinType) =
         (type.toClassDescriptor?.containingDeclaration as PackageFragmentDescriptorImpl).fqName
 
-    private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): List<ClassInfo> {
-        if (parameters.isEmpty()) return emptyList()
+    private fun getAllClassesThatNeedsABuilder(parameters: List<Parameter>): Set<ClassInfo> {
+        if (parameters.isEmpty()) return emptySet()
 
         val builderClassInfo = parameters
             .filter { doesNeedABuilder(it.type) }
@@ -115,7 +115,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
             it.parameters
         }
 
-        return listOf(builderClassInfo, getAllClassesThatNeedsABuilder(newParams)).flatten()
+        return listOf(builderClassInfo, getAllClassesThatNeedsABuilder(newParams)).flatten().toSet()
     }
 
     private fun KotlinType.properties(): List<Parameter> {

@@ -2,7 +2,7 @@ package com.github.affishaikh.kotlinbuildergenerator.domain
 
 import org.jetbrains.kotlin.types.KotlinType
 
-class Parameter(
+data class Parameter(
     val name: String,
     val type: KotlinType
 ) {
