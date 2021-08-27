@@ -258,7 +258,65 @@ class GenerateBuilderTest {
         verifyIntentionResults(actualBuilder, mapOf("Customer.kt" to customerClass))
     }
 
-    private fun verifyIntentionResults(actualBuilder: String, testClasses: Map<String, String>) {
+    @Test
+    fun `should create builder for a class having nullable types`() {
+        val customerClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class Customer(<caret>
+                val name: String?,
+                val gender: Gender?,
+                val age: Int?,
+                val isIndian: Boolean?,
+                val isHandicap: Char?,
+                val salary1: Float?,
+                val list: List<String>?,
+                val set: Set<String>?,
+                val map: Map<String, Any>?
+            )
+
+            enum class Gender {
+                MALE,
+                FEMALE
+            }
+        """.trimIndent()
+
+        val expectedBuilder = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            import com.github.affishaikh.kotlinbuildergenerator.domain.Gender.MALE
+
+            data class CustomerBuilder(
+            val name: String? = "",
+            val gender: Gender? = MALE,
+            val age: Int? = 0,
+            val isIndian: Boolean? = false,
+            val isHandicap: Char? = '',
+            val salary1: Float? = 0.0f,
+            val list: List<String>? = listOf(),
+            val set: Set<String>? = setOf(),
+            val map: Map<String, Any>? = mapOf()
+            ) {
+            fun build(): Customer {
+            return Customer(
+            name = name,
+            gender = gender,
+            age = age,
+            isIndian = isIndian,
+            isHandicap = isHandicap,
+            salary1 = salary1,
+            list = list,
+            set = set,
+            map = map
+            )
+            }
+            }
+        """.trimIndent()
+
+        verifyIntentionResults(expectedBuilder, mapOf("Customer.kt" to customerClass))
+    }
+
+    private fun verifyIntentionResults(expectedBuilder: String, testClasses: Map<String, String>) {
         testClasses.map {
             fixture.configureByText(it.key, it.value)
         }
@@ -269,6 +327,6 @@ class GenerateBuilderTest {
             anyConstructed<FileService>().createFile(any(), capture(builderSlot))
         }
 
-        assertEquals(actualBuilder, builderSlot.captured)
+        assertEquals(expectedBuilder, builderSlot.captured)
     }
 }
