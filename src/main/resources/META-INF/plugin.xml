@@ -40,16 +40,6 @@
     <depends>com.intellij.modules.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <applicationService serviceImplementation="com.github.affishaikh.kotlinbuildergenerator.services.MyApplicationService"/>
-        <projectService serviceImplementation="com.github.affishaikh.kotlinbuildergenerator.services.MyProjectService"/>
-    </extensions>
-
-    <projectListeners>
-        <listener class="com.github.affishaikh.kotlinbuildergenerator.listeners.MyProjectManagerListener"
-                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
-    </projectListeners>
-
-    <extensions defaultExtensionNs="com.intellij">
         <intentionAction>
             <className>com.github.affishaikh.kotlinbuildergenerator.action.GenerateBuilder</className>
             <category>Kotlin</category>
