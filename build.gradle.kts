@@ -3,18 +3,13 @@ import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    // Java support
     id("java")
-    // Kotlin support
     id("org.jetbrains.kotlin.jvm") version "1.3.72"
+
     // gradle-intellij-plugin - read more: https://github.com/JetBrains/gradle-intellij-plugin
     id("org.jetbrains.intellij") version "0.4.21"
     // gradle-changelog-plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
     id("org.jetbrains.changelog") version "0.4.0"
-    // detekt linter - read more: https://detekt.github.io/detekt/kotlindsl.html
-//    id("io.gitlab.arturbosch.detekt") version "1.10.0"
-    // ktlint linter - read more: https://github.com/JLLeitschuh/ktlint-gradle
-//    id("org.jlleitschuh.gradle.ktlint") version "9.2.1"
 }
 
 // Import variables from gradle.properties file
@@ -38,8 +33,8 @@ repositories {
 }
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
+
     testImplementation("io.mockk:mockk:1.10.0")
-//    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.10.0")
 }
 
 // Configure gradle-intellij-plugin plugin.

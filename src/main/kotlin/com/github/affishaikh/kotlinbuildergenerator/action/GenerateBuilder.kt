@@ -2,9 +2,10 @@ package com.github.affishaikh.kotlinbuildergenerator.action
 
 import com.github.affishaikh.kotlinbuildergenerator.domain.ClassInfo
 import com.github.affishaikh.kotlinbuildergenerator.domain.Parameter
+import com.github.affishaikh.kotlinbuildergenerator.services.DefaultValuesFactory
 import com.github.affishaikh.kotlinbuildergenerator.services.FileService
+import com.github.affishaikh.kotlinbuildergenerator.services.TypeChecker
 import com.intellij.openapi.editor.Editor
-import org.jetbrains.kotlin.builtins.KotlinBuiltIns
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
@@ -19,6 +20,9 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     KtClass::class.java,
     "Generate builder"
 ) {
+    private val defaultValuesFactory = DefaultValuesFactory()
+    private val typeChecker = TypeChecker()
+
     override fun applyTo(element: KtClass, editor: Editor?) {
         val code = generateCode(element)
         createFile(element, code)
@@ -71,7 +75,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
                 emptySet()
             }
 
-            if (doesNeedABuilder(prop.type)) {
+            if (typeChecker.doesNeedABuilder(prop.type)) {
                 acc.plus(importStatement.plus(getAllImportStatements(prop.type.properties(), packageName)))
             } else {
                 acc.plus(importStatement)
@@ -80,7 +84,9 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun doesNeedAImport(type: KotlinType, packageName: String): Boolean {
-        return isNotStandardType(type) && (isNotInSamePackage(type, packageName) || isEnumClass(type))
+        return isNotStandardType(type) && (isNotInSamePackage(type, packageName) || typeChecker.isEnumClass(
+            type
+        ))
     }
 
     private fun isNotStandardType(type: KotlinType) = type.nameIfStandardType == null
@@ -88,10 +94,10 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     private fun createImportStatement(type: KotlinType, className: String, packageName: String): String {
         val importStatement = "import ${packagePrefix(type)}.$className"
 
-        return if (isEnumClass(type) && isNotInSamePackage(type, packageName))
-            "$importStatement\n$importStatement.${valueForEnum(type)}"
-        else if (isEnumClass(type))
-            "$importStatement.${valueForEnum(type)}"
+        return if (typeChecker.isEnumClass(type) && isNotInSamePackage(type, packageName))
+            "$importStatement\n$importStatement.${defaultValuesFactory.valueForEnum(type)}"
+        else if (typeChecker.isEnumClass(type))
+            "$importStatement.${defaultValuesFactory.valueForEnum(type)}"
         else importStatement
     }
 
@@ -106,7 +112,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         if (parameters.isEmpty()) return emptySet()
 
         val builderClassInfo = parameters
-            .filter { doesNeedABuilder(it.type) }
+            .filter { typeChecker.doesNeedABuilder(it.type) }
             .map {
                 ClassInfo(it.typeName(), it.type, it.type.properties())
             }
@@ -122,27 +128,6 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         return getConstructorParameters(this).map { valueParam ->
             Parameter(valueParam.name.identifier, valueParam.type)
         }
-    }
-
-    private fun doesNeedABuilder(it: KotlinType) =
-        !isKotlinBuiltinType(it) && it.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters?.isNotEmpty() ?: false
-
-    private fun isKotlinBuiltinType(type: KotlinType): Boolean {
-        return KotlinBuiltIns.isBoolean(type) ||
-            KotlinBuiltIns.isChar(type) ||
-            KotlinBuiltIns.isDouble(type) ||
-            KotlinBuiltIns.isFloat(type) ||
-            KotlinBuiltIns.isInt(type) ||
-            KotlinBuiltIns.isLong(type) ||
-            KotlinBuiltIns.isShort(type) ||
-            KotlinBuiltIns.isCollectionOrNullableCollection(type) ||
-            KotlinBuiltIns.isNullableAny(type) ||
-            KotlinBuiltIns.isString(type) ||
-            KotlinBuiltIns.isListOrNullableList(type) ||
-            KotlinBuiltIns.isSetOrNullableSet(type) ||
-            KotlinBuiltIns.isMapOrNullableMap(type) ||
-            isBigDecimal(type) ||
-            isEnumClass(type)
     }
 
     private fun createFile(element: KtClass, classCode: String) {
@@ -167,61 +152,8 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         return "$declaration$params\n)\n}"
     }
 
-    private fun defaultValue(parameterType: KotlinType): String {
-        return when {
-            KotlinBuiltIns.isBoolean(parameterType) -> "false"
-            KotlinBuiltIns.isChar(parameterType) -> "''"
-            KotlinBuiltIns.isDouble(parameterType) -> "0.0"
-            KotlinBuiltIns.isFloat(parameterType) -> "0.0f"
-            KotlinBuiltIns.isInt(parameterType) || KotlinBuiltIns.isLong(parameterType) || KotlinBuiltIns.isShort(parameterType) -> "0"
-            KotlinBuiltIns.isCollectionOrNullableCollection(parameterType) -> "arrayOf()"
-            KotlinBuiltIns.isNullableAny(parameterType) -> "null"
-            KotlinBuiltIns.isString(parameterType) -> "\"\""
-            KotlinBuiltIns.isListOrNullableList(parameterType) -> "listOf()"
-            KotlinBuiltIns.isSetOrNullableSet(parameterType) -> "setOf()"
-            KotlinBuiltIns.isMapOrNullableMap(parameterType) -> "mapOf()"
-            isBigDecimal(parameterType) -> "BigDecimal.ZERO"
-            parameterType.isMarkedNullable -> "null"
-            isEnumClass(parameterType) -> valueForEnum(parameterType)
-            doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
-            hasNowFunction(parameterType) -> initiateWithNow(parameterType)
-            else -> ""
-        }
-    }
-
-    private fun valueForEnum(parameterType: KotlinType): String {
-        val enumConstructorParams = getConstructorParameters(parameterType).map { valueParam ->
-            valueParam.name.identifier
-        } + listOf("name", "ordinal")
-
-        val enumVariableNames = parameterType.memberScope.getVariableNames().map { it.toString() }
-        return (enumVariableNames - enumConstructorParams).first().toString()
-    }
+    private fun defaultValue(parameterType: KotlinType) = defaultValuesFactory.defaultValue(parameterType)
 
     private fun getConstructorParameters(parameterType: KotlinType): MutableList<ValueParameterDescriptor> =
         parameterType.toClassDescriptor?.unsubstitutedPrimaryConstructor?.valueParameters!!
-
-    private fun isBigDecimal(parameterType: KotlinType): Boolean {
-        return parameterType.constructor.declarationDescriptor?.name?.identifier == "BigDecimal"
-    }
-
-    private fun isEnumClass(parameterType: KotlinType): Boolean {
-        return parameterType.toClassDescriptor?.kind?.name == "ENUM_CLASS"
-    }
-
-    private fun hasNowFunction(parameterType: KotlinType): Boolean {
-        val name = parameterType.constructor.declarationDescriptor?.name?.identifier
-        return temporalHavingNowFunction.contains(name)
-    }
-
-    private fun initiateWithNow(parameterType: KotlinType): String {
-        val temporal = parameterType.constructor.declarationDescriptor?.name?.identifier
-        return """$temporal.now()"""
-    }
-
-    private val temporalHavingNowFunction = listOf(
-        "HijrahDate", "Instant", "JapaneseDate", "LocalDate", "LocalDateTime", "LocalTime",
-        "MinguoDate", "OffsetDateTime", "OffsetTime", "ThaiBuddhistDate", "Year", "YearMonth",
-        "ZonedDateTime"
-    )
 }

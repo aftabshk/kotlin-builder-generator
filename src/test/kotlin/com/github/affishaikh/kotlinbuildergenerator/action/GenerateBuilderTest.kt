@@ -133,7 +133,7 @@ class GenerateBuilderTest {
             )
         """.trimIndent()
 
-        val actualBuilder = """
+        val expectedBuilder = """
             package com.github.affishaikh.kotlinbuildergenerator.domain
 
             import com.github.affishaikh.kotlinbuildergenerator.action.Address
@@ -162,7 +162,7 @@ class GenerateBuilderTest {
             }
         """.trimIndent()
 
-        verifyIntentionResults(actualBuilder, mapOf("Address.kt" to addressClass, "Person.kt" to personClass))
+        verifyIntentionResults(expectedBuilder, mapOf("Address.kt" to addressClass, "Person.kt" to personClass))
     }
 
     @Test
