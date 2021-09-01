@@ -316,6 +316,52 @@ class GenerateBuilderTest {
         verifyIntentionResults(expectedBuilder, mapOf("Customer.kt" to customerClass))
     }
 
+    @Test
+    fun `should create the builder for a class which has another nullable class composed in it`() {
+        val testClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class Person(<caret>
+                val name: String,
+                val address: Address?
+            )
+
+            data class Address(
+                val street: String,
+                val pinCode: Int 
+            )
+        """.trimIndent()
+
+        val actualBuilder = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class PersonBuilder(
+            val name: String = "",
+            val address: Address? = AddressBuilder().build()
+            ) {
+            fun build(): Person {
+            return Person(
+            name = name,
+            address = address
+            )
+            }
+            }
+            data class AddressBuilder(
+            val street: String = "",
+            val pinCode: Int = 0
+            ) {
+            fun build(): Address {
+            return Address(
+            street = street,
+            pinCode = pinCode
+            )
+            }
+            }
+        """.trimIndent()
+
+        verifyIntentionResults(actualBuilder, mapOf("Person.kt" to testClass))
+    }
+
     private fun verifyIntentionResults(expectedBuilder: String, testClasses: Map<String, String>) {
         testClasses.map {
             fixture.configureByText(it.key, it.value)

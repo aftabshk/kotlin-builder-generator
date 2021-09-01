@@ -27,7 +27,7 @@ class DefaultValuesFactory {
             typeChecker.isEnumClass(parameterType) -> valueForEnum(parameterType)
             typeChecker.isDateTimeType(parameterType) -> initiateWithNow(parameterType)
             KotlinBuiltIns.isNullableAny(parameterType) -> "null"
-            typeChecker.doesNeedABuilder(parameterType) -> "${parameterType}Builder().build()"
+            typeChecker.doesNeedABuilder(parameterType) -> "${parameterType.toString().replace("?", "")}Builder().build()"
             parameterType.isMarkedNullable -> "null"
             else -> ""
         }
