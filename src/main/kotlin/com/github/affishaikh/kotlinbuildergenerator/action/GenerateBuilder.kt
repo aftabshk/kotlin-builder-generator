@@ -9,11 +9,11 @@ import com.intellij.openapi.editor.Editor
 import org.jetbrains.kotlin.descriptors.ValueParameterDescriptor
 import org.jetbrains.kotlin.descriptors.impl.PackageFragmentDescriptorImpl
 import org.jetbrains.kotlin.idea.intentions.SelfTargetingIntention
-import org.jetbrains.kotlin.idea.refactoring.memberInfo.qualifiedClassNameForRendering
 import org.jetbrains.kotlin.js.descriptorUtils.nameIfStandardType
 import org.jetbrains.kotlin.nj2k.postProcessing.type
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.types.KotlinType
+import org.jetbrains.kotlin.types.typeUtil.makeNotNullable
 import org.jetbrains.kotlinx.serialization.compiler.resolve.toClassDescriptor
 
 class GenerateBuilder : SelfTargetingIntention<KtClass>(
@@ -34,7 +34,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
     }
 
     private fun generateCode(element: KtClass): String {
-        val packageName = extractPackageNameFrom(element.qualifiedClassNameForRendering())
+        val packageName = extractPackageNameFrom(element.fqName.toString())
         val classProperties = element.properties()
         val allBuilderClasses = getAllClassesThatNeedsABuilder(classProperties)
         val importStatements = getAllImportStatements(classProperties, packageName)
@@ -114,7 +114,7 @@ class GenerateBuilder : SelfTargetingIntention<KtClass>(
         val builderClassInfo = parameters
             .filter { typeChecker.doesNeedABuilder(it.type) }
             .map {
-                ClassInfo(it.typeName(), it.type, it.type.properties())
+                ClassInfo(it.typeName(), it.type.makeNotNullable(), it.type.properties())
             }
 
         val newParams = builderClassInfo.flatMap {

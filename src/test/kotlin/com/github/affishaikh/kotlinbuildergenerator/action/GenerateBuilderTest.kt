@@ -362,6 +362,62 @@ class GenerateBuilderTest {
         verifyIntentionResults(actualBuilder, mapOf("Person.kt" to testClass))
     }
 
+    @Test
+    fun `should not create duplicate data classes when composed type is nullable`() {
+        val customerClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class Customer(<caret>
+                val personalDetails: PersonalDetails?,
+                val nomineeDetails: NomineeDetails
+            )
+
+            data class PersonalDetails(
+                val name: String
+            )
+
+            data class NomineeDetails(
+                val personalDetails: PersonalDetails
+            )
+        """.trimIndent()
+
+        val actualBuilder = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            data class CustomerBuilder(
+            val personalDetails: PersonalDetails? = PersonalDetailsBuilder().build(),
+            val nomineeDetails: NomineeDetails = NomineeDetailsBuilder().build()
+            ) {
+            fun build(): Customer {
+            return Customer(
+            personalDetails = personalDetails,
+            nomineeDetails = nomineeDetails
+            )
+            }
+            }
+            data class PersonalDetailsBuilder(
+            val name: String = ""
+            ) {
+            fun build(): PersonalDetails {
+            return PersonalDetails(
+            name = name
+            )
+            }
+            }
+            data class NomineeDetailsBuilder(
+            val personalDetails: PersonalDetails = PersonalDetailsBuilder().build()
+            ) {
+            fun build(): NomineeDetails {
+            return NomineeDetails(
+            personalDetails = personalDetails
+            )
+            }
+            }
+        """.trimIndent()
+
+        verifyIntentionResults(actualBuilder, mapOf("Customer.kt" to customerClass))
+    }
+
     private fun verifyIntentionResults(expectedBuilder: String, testClasses: Map<String, String>) {
         testClasses.map {
             fixture.configureByText(it.key, it.value)
