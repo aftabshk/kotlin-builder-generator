@@ -5,11 +5,11 @@ import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.fixtures.CodeInsightTestFixture
 import com.intellij.testFramework.fixtures.IdeaTestFixtureFactory
 import com.intellij.testFramework.fixtures.impl.LightTempDirTestFixtureImpl
+import io.kotest.matchers.shouldBe
 import io.mockk.*
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import kotlin.test.assertEquals
 
 class GenerateBuilderTest {
     private val generateBuilderIntention = GenerateBuilder()
@@ -373,6 +373,6 @@ class GenerateBuilderTest {
             anyConstructed<FileService>().createFile(any(), capture(builderSlot))
         }
 
-        assertEquals(expectedBuilder, builderSlot.captured)
+        builderSlot.captured shouldBe expectedBuilder
     }
 }

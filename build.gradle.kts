@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.3.72"
 
     // gradle-intellij-plugin - read more: https://github.com/JetBrains/gradle-intellij-plugin
-    id("org.jetbrains.intellij") version "0.4.21"
+    id("org.jetbrains.intellij") version "0.7.3"
     // gradle-changelog-plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
     id("org.jetbrains.changelog") version "0.4.0"
 }
@@ -31,55 +31,37 @@ repositories {
     mavenCentral()
     jcenter()
 }
+
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
 
-    testImplementation("io.mockk:mockk:1.10.0")
+    // https://mvnrepository.com/artifact/io.kotest/kotest-assertions-core-jvm
+    testImplementation("io.kotest:kotest-assertions-core-jvm:4.1.0")
+    testImplementation("io.mockk:mockk:1.12.0")
 }
 
 // Configure gradle-intellij-plugin plugin.
 // Read more: https://github.com/JetBrains/gradle-intellij-plugin
 intellij {
-    pluginName = pluginName
-    version = platformVersion
-    type = platformType
-    downloadSources = platformDownloadSources.toBoolean()
-    updateSinceUntilBuild = true
-
-//  Plugin Dependencies:
-//  https://www.jetbrains.org/intellij/sdk/docs/basics/plugin_structure/plugin_dependencies.html
-//
-  setPlugins("Kotlin", "java")
+    this.pluginName = pluginName
+    this.version = platformVersion
+    this.type = platformType
+    this.downloadSources = platformDownloadSources.toBoolean()
+    this.updateSinceUntilBuild = true
+    setPlugins("Kotlin", "java")
 }
 
-// Configure detekt plugin.
-// Read more: https://detekt.github.io/detekt/kotlindsl.html
-//detekt {
-//    config = files("./detekt-config.yml")
-//    buildUponDefaultConfig = true
-//
-//    reports {
-//        html.enabled = false
-//        xml.enabled = false
-//        txt.enabled = false
-//    }
-//}
-
 tasks {
-    // Set the compatibility versions to 1.8
+    // Set the compatibility versions to 11
     withType<JavaCompile> {
-        sourceCompatibility = "1.8"
-        targetCompatibility = "1.8"
+        sourceCompatibility = "11"
+        targetCompatibility = "11"
     }
     listOf("compileKotlin", "compileTestKotlin").forEach {
         getByName<KotlinCompile>(it) {
-            kotlinOptions.jvmTarget = "1.8"
+            kotlinOptions.jvmTarget = "11"
         }
     }
-
-//    withType<Detekt> {
-//        jvmTarget = "1.8"
-//    }
 
     patchPluginXml {
         version(pluginVersion)
