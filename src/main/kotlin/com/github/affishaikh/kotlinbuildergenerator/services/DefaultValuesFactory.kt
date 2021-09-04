@@ -33,13 +33,13 @@ class DefaultValuesFactory {
         }
     }
 
-    fun valueForEnum(parameterType: KotlinType): String {
+    private fun valueForEnum(parameterType: KotlinType): String {
         val enumConstructorParams = getConstructorParameters(parameterType).map { valueParam ->
             valueParam.name.identifier
         } + listOf("name", "ordinal")
 
         val enumVariableNames = parameterType.memberScope.getVariableNames().map { it.toString() }
-        return (enumVariableNames - enumConstructorParams).first().toString()
+        return "${parameterType.toString().replace("?", "")}.${(enumVariableNames - enumConstructorParams).first()}"
     }
 
     private fun getConstructorParameters(parameterType: KotlinType): MutableList<ValueParameterDescriptor> =

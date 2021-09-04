@@ -240,11 +240,9 @@ class GenerateBuilderTest {
         val actualBuilder = """
             package com.github.affishaikh.kotlinbuildergenerator.domain
 
-            import com.github.affishaikh.kotlinbuildergenerator.domain.Gender.MALE
-
             data class CustomerBuilder(
             val name: String = "",
-            val gender: Gender = MALE
+            val gender: Gender = Gender.MALE
             ) {
             fun build(): Customer {
             return Customer(
@@ -284,11 +282,9 @@ class GenerateBuilderTest {
         val expectedBuilder = """
             package com.github.affishaikh.kotlinbuildergenerator.domain
 
-            import com.github.affishaikh.kotlinbuildergenerator.domain.Gender.MALE
-
             data class CustomerBuilder(
             val name: String? = "",
-            val gender: Gender? = MALE,
+            val gender: Gender? = Gender.MALE,
             val age: Int? = 0,
             val isIndian: Boolean? = false,
             val isHandicap: Char? = '',
@@ -416,6 +412,49 @@ class GenerateBuilderTest {
         """.trimIndent()
 
         verifyIntentionResults(actualBuilder, mapOf("Customer.kt" to customerClass))
+    }
+
+    @Test
+    fun `should add imports for enum`() {
+        val customerClass = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            import com.github.affishaikh.kotlinbuildergenerator.sample.Gender
+
+            data class Customer(<caret>
+                val name: String,
+                val gender: Gender
+            )
+            """.trimIndent()
+
+        val genderEnum = """
+            package com.github.affishaikh.kotlinbuildergenerator.sample
+
+            enum class Gender {
+                MALE,
+                FEMALE
+            }
+            """.trimIndent()
+
+        val expectedBuilder = """
+            package com.github.affishaikh.kotlinbuildergenerator.domain
+
+            import com.github.affishaikh.kotlinbuildergenerator.sample.Gender
+            
+            data class CustomerBuilder(
+            val name: String = "",
+            val gender: Gender = Gender.MALE
+            ) {
+            fun build(): Customer {
+            return Customer(
+            name = name,
+            gender = gender
+            )
+            }
+            }
+            """.trimIndent()
+
+        verifyIntentionResults(expectedBuilder, mapOf("Gender.kt" to genderEnum, "Customer.kt" to customerClass))
     }
 
     private fun verifyIntentionResults(expectedBuilder: String, testClasses: Map<String, String>) {
